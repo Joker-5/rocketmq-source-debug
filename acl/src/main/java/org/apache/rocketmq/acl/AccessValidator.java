@@ -22,6 +22,8 @@ import org.apache.rocketmq.common.AclConfig;
 import org.apache.rocketmq.common.PlainAccessConfig;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+// 访问验证器接口
+// 核心定义方法是parse()和validate()
 public interface AccessValidator {
 
     /**
@@ -31,6 +33,7 @@ public interface AccessValidator {
      * @param remoteAddr
      * @return Plain access resource result,include access key,signature and some other access attributes.
      */
+    // 从request header中解析本次请求对应的访问资源，i.e.本次请求需要的访问权限
     AccessResource parse(RemotingCommand request, String remoteAddr);
 
     /**
@@ -38,6 +41,7 @@ public interface AccessValidator {
      *
      * @param accessResource
      */
+    // 根据本次请求需要的访问权限，于请求用户所有的权限进行对比，如果没有对应权限则抛错，否则放行
     void validate(AccessResource accessResource);
 
     /**
