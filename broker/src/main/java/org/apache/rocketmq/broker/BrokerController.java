@@ -480,6 +480,7 @@ public class BrokerController {
                 }
             }
             initialTransaction();
+            // ACL入口代码
             initialAcl();
             initialRpcHooks();
         }
@@ -502,17 +503,25 @@ public class BrokerController {
     }
 
     private void initialAcl() {
+        // 首先判断Broker是否开启了ACL，通过参数「aclEnable」指定，
+        // 默认为false
         if (!this.brokerConfig.isAclEnable()) {
             log.info("The broker dose not enable acl");
             return;
         }
 
+        // 使用类似SPI的机制，加载配置的AccessValidator，获取一个list，
+        // 实现逻辑是读取「META-INF/service/org.apache.rocketmq.acl.AccessValidator」文件中配置的访问验证器
+        // 默认配置为「org.apache.rocketmq.acl.plain.PlainAccessValidator」
         List<AccessValidator> accessValidators = ServiceProvider.load(ServiceProvider.ACL_VALIDATOR_ID, AccessValidator.class);
         if (accessValidators == null || accessValidators.isEmpty()) {
             log.info("The broker dose not load the AccessValidator");
             return;
         }
 
+        // 遍历配置的AccessValidator，并向Broker处理器注册钩子函数，
+        // RPCHook的doBeforeRequest方法会在服务端接收到请求，将其解码后，在执行处理请求之前被调用，
+        // doAfterRequest方法会在处理完请求后，将结果返回前被调用
         for (AccessValidator accessValidator: accessValidators) {
             final AccessValidator validator = accessValidator;
             accessValidatorMap.put(validator.getClass(),validator);
@@ -520,6 +529,8 @@ public class BrokerController {
 
                 @Override
                 public void doBeforeRequest(String remoteAddr, RemotingCommand request) {
+                    // 在执行真实的处理逻辑之前先执行ACL的验证逻辑（一些必要逻辑和字段的校验），
+                    // 如果有该操作的执行权限就放行，否则抛AclException
                     //Do not catch the exception
                     validator.validate(validator.parse(request, remoteAddr));
                 }
