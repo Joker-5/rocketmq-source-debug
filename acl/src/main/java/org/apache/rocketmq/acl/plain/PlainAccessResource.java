@@ -56,7 +56,8 @@ public class PlainAccessResource implements AccessResource {
     // 请求头和请求体的内容
     private byte[] content;
 
-    // 签名字符串，常见的操作是：在客户端首先将请求参数排序，之后使用secretKey来生成签名字符串，
+    // 签名字符串
+    // 常见的操作是：在客户端首先将请求参数排序，之后使用secretKey来生成签名字符串，
     // 服务端重复此步骤，之后对比生成的签名字符串，如果相同则视为登录成功，否则失败
     private String signature;
 
