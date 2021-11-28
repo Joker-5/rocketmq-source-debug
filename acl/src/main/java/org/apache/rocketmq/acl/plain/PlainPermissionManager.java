@@ -40,23 +40,31 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+// 该class主要职责：加载权限，解析acl主要配置文件「plain_acl.yml」
 public class PlainPermissionManager {
 
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
 
+    // 默认acl配置文件名，默认为「/conf/plain_acl.yml」
     private static final String DEFAULT_PLAIN_ACL_FILE = "/conf/plain_acl.yml";
 
     private String fileHome = System.getProperty(MixAll.ROCKETMQ_HOME_PROPERTY,
         System.getenv(MixAll.ROCKETMQ_HOME_ENV));
 
+    // acl配置文件名，默认为DEFAULT_PLAIN_ACL_FILE，即上面的「/conf/plain_acl.yml」
+    // 可通过系统参数 「-Drocketmq.acl.plain.file=fileName」指定
     private String fileName = System.getProperty("rocketmq.acl.plain.file", DEFAULT_PLAIN_ACL_FILE);
 
+    // 解析出来的权限配置映射表，以用户名为key
     private Map<String/** AccessKey **/, PlainAccessResource> plainAccessResourceMap = new HashMap<>();
 
     private List<RemoteAddressStrategy> globalWhiteRemoteAddressStrategy = new ArrayList<>();
 
+    // 远程IP解析策略工厂，用于解析白名单IP地址
     private RemoteAddressStrategyFactory remoteAddressStrategyFactory = new RemoteAddressStrategyFactory();
 
+    // 是否开启了文件监听，i.e.自动监听plain_acl.yml文件，
+    // 一旦该文件改变，可在不重启服务器的情况下自动生效
     private boolean isWatchStart;
 
     private final DataVersion dataVersion = new DataVersion();
@@ -66,6 +74,7 @@ public class PlainPermissionManager {
         watch();
     }
 
+    // 加载配置文件
     public void load() {
 
         Map<String, PlainAccessResource> plainAccessResourceMap = new HashMap<>();
