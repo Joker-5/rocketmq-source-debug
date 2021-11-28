@@ -144,6 +144,8 @@ public class PlainAccessValidator implements AccessValidator {
         return accessResource;
     }
 
+    // 验证权限
+    // i.e.根据本次请求需要的权限与当前用户拥有的权限进行对比，如果符合就正常执行，否则抛AclException
     @Override
     public void validate(AccessResource accessResource) {
         aclPlugEngine.validate((PlainAccessResource) accessResource);
