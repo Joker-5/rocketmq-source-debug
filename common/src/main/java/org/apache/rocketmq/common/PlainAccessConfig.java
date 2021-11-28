@@ -18,6 +18,7 @@ package org.apache.rocketmq.common;
 
 import java.util.List;
 
+// 下面这些属性都是plain_acl.yml中accounts支持的标签
 public class PlainAccessConfig {
 
     private String accessKey;

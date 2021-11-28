@@ -70,6 +70,7 @@ public class PlainPermissionManager {
     private final DataVersion dataVersion = new DataVersion();
 
     public PlainPermissionManager() {
+        // load主要负责对acl配置文件进行解析，将用户定义的权限加载到内存中
         load();
         watch();
     }
@@ -77,15 +78,20 @@ public class PlainPermissionManager {
     // 加载配置文件
     public void load() {
 
+        // 初始化plainAccessResourceMap（用户配置的访问资源）、
+        // globalWhiteRemoteAddressStrategy（全局IP白名单访问策略）
         Map<String, PlainAccessResource> plainAccessResourceMap = new HashMap<>();
         List<RemoteAddressStrategy> globalWhiteRemoteAddressStrategy = new ArrayList<>();
 
+        // 获取配置文件内容，路径默认为${ROCKETMQ_HOME}/conf/plain_acl.yml
         JSONObject plainAclConfData = AclUtils.getYamlDataObject(fileHome + File.separator + fileName,
             JSONObject.class);
         if (plainAclConfData == null || plainAclConfData.isEmpty()) {
             throw new AclException(String.format("%s file is not data", fileHome + File.separator + fileName));
         }
         log.info("Broker plain acl conf data is : ", plainAclConfData.toString());
+        // globalWhiteRemoteAddress即全局白名单
+        // 根据配置规则，使用remoteAddressStrategyFactory工厂来获取访问策略
         JSONArray globalWhiteRemoteAddressesList = plainAclConfData.getJSONArray("globalWhiteRemoteAddresses");
         if (globalWhiteRemoteAddressesList != null && !globalWhiteRemoteAddressesList.isEmpty()) {
             for (int i = 0; i < globalWhiteRemoteAddressesList.size(); i++) {
@@ -94,6 +100,7 @@ public class PlainPermissionManager {
             }
         }
 
+        // 解析plain_acl.yml的另外一个根元素「accounts」，即用户定义的权限信息
         JSONArray accounts = plainAclConfData.getJSONArray(AclConstants.CONFIG_ACCOUNTS);
         if (accounts != null && !accounts.isEmpty()) {
             List<PlainAccessConfig> plainAccessConfigList = accounts.toJavaList(PlainAccessConfig.class);
