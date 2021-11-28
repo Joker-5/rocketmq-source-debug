@@ -48,6 +48,7 @@ public class PlainPermissionManager {
     // 默认acl配置文件名，默认为「/conf/plain_acl.yml」
     private static final String DEFAULT_PLAIN_ACL_FILE = "/conf/plain_acl.yml";
 
+    // 配置文件的home路径
     private String fileHome = System.getProperty(MixAll.ROCKETMQ_HOME_PROPERTY,
         System.getenv(MixAll.ROCKETMQ_HOME_ENV));
 
@@ -72,6 +73,7 @@ public class PlainPermissionManager {
     public PlainPermissionManager() {
         // load主要负责对acl配置文件进行解析，将用户定义的权限加载到内存中
         load();
+        // 监听器
         watch();
     }
 
@@ -318,6 +320,9 @@ public class PlainPermissionManager {
     private void watch() {
         try {
             String watchFilePath = fileHome + fileName;
+            // 注册监听器，默认以500ms的频率监听配置文件的内容是否发送变化，
+            // 当内容变化后调用load()方法重新加载配置文件
+            // TODO 如何监听文件内容发生变化？
             FileWatchService fileWatchService = new FileWatchService(new String[] {watchFilePath}, new FileWatchService.Listener() {
                 @Override
                 public void onChanged(String path) {

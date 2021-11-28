@@ -39,6 +39,7 @@ public class FileWatchService extends ServiceThread {
     private final List<String> watchFiles;
     private final List<String> fileCurrentHash;
     private final Listener listener;
+    // 监听器默认监听频率:500ms
     private static final int WATCH_INTERVAL = 500;
     private MessageDigest md = MessageDigest.getInstance("MD5");
 
@@ -48,6 +49,8 @@ public class FileWatchService extends ServiceThread {
         this.watchFiles = new ArrayList<>();
         this.fileCurrentHash = new ArrayList<>();
 
+        // 判断文件内容是否发生变化的关键就是获取文件的md5签名进行对比
+        // TODO 为什么不在启动时先记录上一次文件的修改时间，然后先判断修改时间是否变化再判断内容是否发生变化呢？
         for (int i = 0; i < watchFiles.length; i++) {
             if (StringUtils.isNotEmpty(watchFiles[i]) && new File(watchFiles[i]).exists()) {
                 this.watchFiles.add(watchFiles[i]);
