@@ -44,12 +44,15 @@ public class PlainAccessValidator implements AccessValidator {
 
     private PlainPermissionManager aclPlugEngine;
 
+    // 在构造器创建PlainPermissionManager对象，触发acl规则的加载，
+    // i.e.解析plain_acl.yml
     public PlainAccessValidator() {
         aclPlugEngine = new PlainPermissionManager();
     }
 
     @Override
     public AccessResource parse(RemotingCommand request, String remoteAddr) {
+        // 创建PlainAccessResource，从远程地址中提取出远程访问IP地址
         PlainAccessResource accessResource = new PlainAccessResource();
         if (remoteAddr != null && remoteAddr.contains(":")) {
             accessResource.setWhiteRemoteAddress(remoteAddr.substring(0, remoteAddr.lastIndexOf(':')));
@@ -57,17 +60,21 @@ public class PlainAccessValidator implements AccessValidator {
             accessResource.setWhiteRemoteAddress(remoteAddr);
         }
 
+        // 获取requestCode
         accessResource.setRequestCode(request.getCode());
 
+        // 如果request header的扩展字段为空，到此就直接返回了
         if (request.getExtFields() == null) {
             // If request's extFields is null,then return accessResource directly(users can use whiteAddress pattern)
             // The following logic codes depend on the request's extFields not to be null.
             return accessResource;
         }
+        // 如果不为空的话则从请求头中依次读取AccessKey、Signature、SecretToken
         accessResource.setAccessKey(request.getExtFields().get(SessionCredentials.ACCESS_KEY));
         accessResource.setSignature(request.getExtFields().get(SessionCredentials.SIGNATURE));
         accessResource.setSecretToken(request.getExtFields().get(SessionCredentials.SECURITY_TOKEN));
 
+        // 根据请求命令，设置本次请求需要拥有的权限
         try {
             switch (request.getCode()) {
                 case RequestCode.SEND_MESSAGE:
@@ -123,6 +130,7 @@ public class PlainAccessValidator implements AccessValidator {
             throw new AclException(t.getMessage(), t);
         }
 
+        // 对扩展字段进行排序，便于生成签名字符串
         // Content
         SortedMap<String, String> map = new TreeMap<String, String>();
         for (Map.Entry<String, String> entry : request.getExtFields().entrySet()) {
@@ -131,6 +139,7 @@ public class PlainAccessValidator implements AccessValidator {
                 map.put(entry.getKey(), entry.getValue());
             }
         }
+        // 之后将扩展字段和请求体写入content字段，完成从请求头中解析出本期请求需要验证的权限
         accessResource.setContent(AclUtils.combineRequestContent(request, map));
         return accessResource;
     }
