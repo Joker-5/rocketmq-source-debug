@@ -22,6 +22,8 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.rocketmq.acl.AccessResource;
 import org.apache.rocketmq.common.MixAll;
 
+// 用户配置的访问资源
+// i.e.权限容器
 public class PlainAccessResource implements AccessResource {
 
     // Identify the user
