@@ -49,9 +49,10 @@ public class FileWatchService extends ServiceThread {
         this.watchFiles = new ArrayList<>();
         this.fileCurrentHash = new ArrayList<>();
 
-        // 判断文件内容是否发生变化的关键就是获取文件的md5签名进行对比
+        // 判断监听文件内容是否发生变化的关键就是获取文件的md5签名进行对比
         // TODO 为什么不在启动时先记录上一次文件的修改时间，然后先判断修改时间是否变化再判断内容是否发生变化呢？
         for (int i = 0; i < watchFiles.length; i++) {
+            // 判断文件名非空&&文件路径存在
             if (StringUtils.isNotEmpty(watchFiles[i]) && new File(watchFiles[i]).exists()) {
                 this.watchFiles.add(watchFiles[i]);
                 this.fileCurrentHash.add(hash(watchFiles[i]));
@@ -92,7 +93,9 @@ public class FileWatchService extends ServiceThread {
         log.info(this.getServiceName() + " service end");
     }
 
+    // 文件hash方法
     private String hash(String filePath) throws IOException, NoSuchAlgorithmException {
+        // 根据文件路径获取配置文件
         Path path = Paths.get(filePath);
         md.update(Files.readAllBytes(path));
         byte[] hash = md.digest();
