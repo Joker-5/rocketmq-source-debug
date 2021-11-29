@@ -39,9 +39,13 @@ public class AclClientRPCHook implements RPCHook {
 
     @Override
     public void doBeforeRequest(String remoteAddr, RemotingCommand request) {
+        // 将Request请求参数进行排序，并加入accessKey
         byte[] total = AclUtils.combineRequestContent(request,
             parseRequestContent(request, sessionCredentials.getAccessKey(), sessionCredentials.getSecurityToken()));
+        // 对排好序的请求参数，用用户配置的密码生成签名（业内有通用的方法），并将其放到扩展字段中，服务端也会用相同算法生成签名，
+        // 如果二者签名相同的话则表示验证成功
         String signature = AclUtils.calSignature(total, sessionCredentials.getSecretKey());
+        // 将字段加到ext字段中，服务端broker拿到这些元数据，结合request header中的信息，根据配置的权限就可以进行权限校验了
         request.addExtField(SIGNATURE, signature);
         request.addExtField(ACCESS_KEY, sessionCredentials.getAccessKey());
         

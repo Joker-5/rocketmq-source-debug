@@ -56,6 +56,7 @@ public class AclClient {
     }
 
     public static void producer() throws MQClientException {
+        // 创建Producer时，若注册AclClientRPCHook钩子函数，则会在向服务端发送远程命令前后执行钩子函数
         DefaultMQProducer producer = new DefaultMQProducer("ProducerGroupName", getAclRPCHook());
         producer.setNamesrvAddr("127.0.0.1:9876");
         producer.start();
