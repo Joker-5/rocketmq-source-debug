@@ -26,6 +26,7 @@ import org.apache.rocketmq.remoting.common.RemotingHelper;
 public class TraceProducer {
     public static void main(String[] args) throws MQClientException, InterruptedException {
 
+        // 启动生产者时开启「enableMsgTrace」（默认不开启）
         DefaultMQProducer producer = new DefaultMQProducer("ProducerGroupName",true);
         producer.start();
 

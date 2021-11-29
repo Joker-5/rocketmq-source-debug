@@ -84,6 +84,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
      *
      * See {@linktourl http://rocketmq.apache.org/docs/core-concept/} for more discussion.
      */
+    // 生产者所属的组
     private String producerGroup;
 
     /**
@@ -246,11 +247,14 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
         this.producerGroup = producerGroup;
         defaultMQProducerImpl = new DefaultMQProducerImpl(this, rpcHook);
         //if client open the message trace feature
+        // 是否开始消息轨迹跟踪
         if (enableMsgTrace) {
             try {
+                // 异步转发消息轨迹数据
                 AsyncTraceDispatcher dispatcher = new AsyncTraceDispatcher(producerGroup, TraceDispatcher.Type.PRODUCE, customizedTraceTopic, rpcHook);
                 dispatcher.setHostProducer(this.defaultMQProducerImpl);
                 traceDispatcher = dispatcher;
+                // 构建SendMessageTraceHookImpl对象，并用AsyncTraceDispatcher来进行异步转发
                 this.defaultMQProducerImpl.registerSendMessageHook(
                     new SendMessageTraceHookImpl(traceDispatcher));
                 this.defaultMQProducerImpl.registerEndTransactionHook(
