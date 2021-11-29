@@ -322,7 +322,7 @@ public class PlainPermissionManager {
             String watchFilePath = fileHome + fileName;
             // 注册监听器，默认以500ms的频率监听配置文件的内容是否发送变化，
             // 当内容变化后调用load()方法重新加载配置文件
-            // TODO 如何监听文件内容发生变化？
+            // TODO 如何监听文件内容发生变化->根据文件内容进行hash（利用了hash的易变性）
             FileWatchService fileWatchService = new FileWatchService(new String[] {watchFilePath}, new FileWatchService.Listener() {
                 @Override
                 public void onChanged(String path) {
@@ -339,27 +339,31 @@ public class PlainPermissionManager {
     }
 
     void checkPerm(PlainAccessResource needCheckedAccess, PlainAccessResource ownedAccess) {
+        // 如果当前用户非管理员但想获取管理员权限，抛错
         if (Permission.needAdminPerm(needCheckedAccess.getRequestCode()) && !ownedAccess.isAdmin()) {
             throw new AclException(String.format("Need admin permission for request code=%d, but accessKey=%s is not", needCheckedAccess.getRequestCode(), ownedAccess.getAccessKey()));
         }
         Map<String, Byte> needCheckedPermMap = needCheckedAccess.getResourcePermMap();
         Map<String, Byte> ownedPermMap = ownedAccess.getResourcePermMap();
 
+        // 请求不需要进行权限验证，直接放行
         if (needCheckedPermMap == null) {
             // If the needCheckedPermMap is null,then return
             return;
         }
 
+        // 没配用户权限且当前用户为管理员，直接放行
         if (ownedPermMap == null && ownedAccess.isAdmin()) {
             // If the ownedPermMap is null and it is an admin user, then return
             return;
         }
 
+        // 遍历需要的权限和拥有的权限进行对比
         for (Map.Entry<String, Byte> needCheckedEntry : needCheckedPermMap.entrySet()) {
             String resource = needCheckedEntry.getKey();
             Byte neededPerm = needCheckedEntry.getValue();
             boolean isGroup = PlainAccessResource.isRetryTopic(resource);
-
+            // 如果没配置相应权限，则判断默认权限是否允许，不允许就抛异常
             if (ownedPermMap == null || !ownedPermMap.containsKey(resource)) {
                 // Check the default perm
                 byte ownedPerm = isGroup ? ownedAccess.getDefaultGroupPerm() :
@@ -369,6 +373,7 @@ public class PlainPermissionManager {
                 }
                 continue;
             }
+            // 配置了就走正常验证流程
             if (!Permission.checkPermission(neededPerm, ownedPermMap.get(resource))) {
                 throw new AclException(String.format("No default permission for %s", PlainAccessResource.printStr(resource, isGroup)));
             }
@@ -415,33 +420,38 @@ public class PlainPermissionManager {
     public void validate(PlainAccessResource plainAccessResource) {
 
         // Check the global white remote addr
+        // 首先用全局白名单进行验证，只要有一个规则匹配成功即代表认证成功
         for (RemoteAddressStrategy remoteAddressStrategy : globalWhiteRemoteAddressStrategy) {
             if (remoteAddressStrategy.match(plainAccessResource)) {
                 return;
             }
         }
 
+        // 没配置用户名，抛错
         if (plainAccessResource.getAccessKey() == null) {
             throw new AclException(String.format("No accessKey is configured"));
         }
 
+        // 如果资源配置映射表中没有该用户，抛错
         if (!plainAccessResourceMap.containsKey(plainAccessResource.getAccessKey())) {
             throw new AclException(String.format("No acl config for %s", plainAccessResource.getAccessKey()));
         }
 
         // Check the white addr for accesskey
+        // 如果用户配置的白名单和待访问资源规则匹配的话，则认证成功
         PlainAccessResource ownedAccess = plainAccessResourceMap.get(plainAccessResource.getAccessKey());
         if (ownedAccess.getRemoteAddressStrategy().match(plainAccessResource)) {
             return;
         }
 
         // Check the signature
+        // 验证签名
         String signature = AclUtils.calSignature(plainAccessResource.getContent(), ownedAccess.getSecretKey());
         if (!signature.equals(plainAccessResource.getSignature())) {
             throw new AclException(String.format("Check signature failed for accessKey=%s", plainAccessResource.getAccessKey()));
         }
         // Check perm of each resource
-
+        // 验证需要的权限和拥有的权限是否匹配
         checkPerm(plainAccessResource, ownedAccess);
     }
 
