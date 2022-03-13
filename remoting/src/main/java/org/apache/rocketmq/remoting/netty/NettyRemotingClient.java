@@ -408,7 +408,9 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return this.createChannel(addr);
     }
 
+    // 生产者和消费者从Namesrv列表选择一个可以连接的进行通信
     private Channel getAndCreateNameserverChannel() throws RemotingConnectException, InterruptedException {
+        // 返回已选择，可连接的Namesrv
         String addr = this.namesrvAddrChoosed.get();
         if (addr != null) {
             ChannelWrapper cw = this.channelTables.get(addr);
@@ -428,6 +430,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                     }
                 }
 
+                // 从Namesrv列表选一个返回
                 if (addrList != null && !addrList.isEmpty()) {
                     for (int i = 0; i < addrList.size(); i++) {
                         int index = this.namesrvIndex.incrementAndGet();

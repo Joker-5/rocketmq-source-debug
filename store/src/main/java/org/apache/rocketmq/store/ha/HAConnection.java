@@ -145,9 +145,11 @@ public class HAConnection {
             return ReadSocketService.class.getSimpleName();
         }
 
+        // M处理读事件
         private boolean processReadEvent() {
             int readSizeZeroTimes = 0;
 
+            // 清空byteBufferRead
             if (!this.byteBufferRead.hasRemaining()) {
                 this.byteBufferRead.flip();
                 this.processPosition = 0;
@@ -158,18 +160,22 @@ public class HAConnection {
                     int readSize = this.socketChannel.read(this.byteBufferRead);
                     if (readSize > 0) {
                         readSizeZeroTimes = 0;
+                        // 设置最后读取的时间
                         this.lastReadTimestamp = HAConnection.this.haService.getDefaultMessageStore().getSystemClock().now();
                         if ((this.byteBufferRead.position() - this.processPosition) >= 8) {
+                            // 读取S请求的CommitLog最大位置
                             int pos = this.byteBufferRead.position() - (this.byteBufferRead.position() % 8);
                             long readOffset = this.byteBufferRead.getLong(pos - 8);
                             this.processPosition = pos;
 
+                            // 设置S的CommitLog最大位置
                             HAConnection.this.slaveAckOffset = readOffset;
+                            // 设置S第一次请求的位置
                             if (HAConnection.this.slaveRequestOffset < 0) {
                                 HAConnection.this.slaveRequestOffset = readOffset;
                                 log.info("slave[" + HAConnection.this.clientAddr + "] request offset " + readOffset);
                             }
-
+                            // 通知目前S的进度
                             HAConnection.this.haService.notifyTransferSome(HAConnection.this.slaveAckOffset);
                         }
                     } else if (readSize == 0) {

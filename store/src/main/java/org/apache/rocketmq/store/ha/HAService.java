@@ -409,6 +409,7 @@ public class HAService {
             this.byteBufferBackup = tmp;
         }
 
+        // 处理读取事件
         private boolean processReadEvent() {
             int readSizeZeroTimes = 0;
             while (this.byteBufferRead.hasRemaining()) {
@@ -442,14 +443,19 @@ public class HAService {
             final int msgHeaderSize = 8 + 4; // phyoffset + size
 
             while (true) {
+                // 成功读取到请求
                 int diff = this.byteBufferRead.position() - this.dispatchPosition;
                 if (diff >= msgHeaderSize) {
+                    // 读取masterPhyOffset和bodySize
+                    // 使用dispatchPosition是为了处理「粘包」问题
                     long masterPhyOffset = this.byteBufferRead.getLong(this.dispatchPosition);
                     int bodySize = this.byteBufferRead.getInt(this.dispatchPosition + 8);
 
                     long slavePhyOffset = HAService.this.defaultMessageStore.getMaxPhyOffset();
 
                     if (slavePhyOffset != 0) {
+                        // 校验M传来的offset和S的最大offset是否相同
+                        // 不同就出错，返回失败
                         if (slavePhyOffset != masterPhyOffset) {
                             log.error("master pushed offset not equal the max phy offset in slave, SLAVE: "
                                 + slavePhyOffset + " MASTER: " + masterPhyOffset);
@@ -457,15 +463,19 @@ public class HAService {
                         }
                     }
 
+                    // 读取消息
                     if (diff >= (msgHeaderSize + bodySize)) {
                         byte[] bodyData = byteBufferRead.array();
                         int dataStart = this.dispatchPosition + msgHeaderSize;
 
+                        // 写入数据
                         HAService.this.defaultMessageStore.appendToCommitLog(
                                 masterPhyOffset, bodyData, dataStart, bodySize);
 
+                        // 记录处理到的位置
                         this.dispatchPosition += msgHeaderSize + bodySize;
 
+                        // 同步写入进度
                         if (!reportSlaveMaxOffsetPlus()) {
                             return false;
                         }
@@ -474,6 +484,7 @@ public class HAService {
                     }
                 }
 
+                // 空间写满，重新分配空间
                 if (!this.byteBufferRead.hasRemaining()) {
                     this.reallocateByteBuffer();
                 }
@@ -548,14 +559,16 @@ public class HAService {
             }
         }
 
+        // Slave主循环，向Master同步自己CommitLog已同步的位置
         @Override
         public void run() {
             log.info(this.getServiceName() + " service started");
-
+            // 正常工作无限循环
             while (!this.isStopped()) {
                 try {
                     if (this.connectMaster()) {
-
+                        // 定时同步（默认5s）Slave的CommitLog已经同步到的物理位置
+                        // 同时维持M和S的心跳连接
                         if (this.isTimeToReportOffset()) {
                             boolean result = this.reportSlaveMaxOffset(this.currentReportedOffset);
                             if (!result) {
@@ -564,16 +577,17 @@ public class HAService {
                         }
 
                         this.selector.select(1000);
-
+                        // 处理M向S发送的读取事件
                         boolean ok = this.processReadEvent();
                         if (!ok) {
                             this.closeMaster();
                         }
-
+                        // 进度出现变化，同步Master自己的进度
                         if (!reportSlaveMaxOffsetPlus()) {
                             continue;
                         }
 
+                        // Master过久未返回数据，关闭连接
                         long interval =
                             HAService.this.getDefaultMessageStore().getSystemClock().now()
                                 - this.lastWriteTimestamp;
