@@ -95,6 +95,8 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     /**
      * Number of queues to create per default topic.
      */
+    // 用于控制客户端在生产消费时访问同一个topic的队列数量
+    // 因为对于一个客户端来说，可能他并不需要访问全部队列，只需要使用其中几个就行
     private volatile int defaultTopicQueueNums = 4;
 
     /**

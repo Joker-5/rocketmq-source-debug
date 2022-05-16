@@ -23,8 +23,10 @@ public class TopicConfig {
     public static int defaultReadQueueNums = 16;
     public static int defaultWriteQueueNums = 16;
     private String topicName;
+    // 服务端控制每个客户端在生产消费时分别可访问多少队列，他们的优先级高五客户端的defaultTopicQueueNums
     private int readQueueNums = defaultReadQueueNums;
     private int writeQueueNums = defaultWriteQueueNums;
+    // 设置Topic的读写等权限
     private int perm = PermName.PERM_READ | PermName.PERM_WRITE;
     private TopicFilterType topicFilterType = TopicFilterType.SINGLE_TAG;
     private int topicSysFlag = 0;
