@@ -200,12 +200,20 @@ public class TransactionalMessageBridge {
         return store.asyncPutMessage(parseHalfMessageInner(messageInner));
     }
 
+    // 事务消息核心实现
+    // 关键在于对消息的topic和queue进行替换
     private MessageExtBrokerInner parseHalfMessageInner(MessageExtBrokerInner msgInner) {
+        // 记录消息的原topic和queue，将其放到新的属性real_xxx中
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_TOPIC, msgInner.getTopic());
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_QUEUE_ID,
             String.valueOf(msgInner.getQueueId()));
         msgInner.setSysFlag(
             MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), MessageSysFlag.TRANSACTION_NOT_TYPE));
+        // 将主题和队列进行替换
+        // 原topic -> RMQ_SYS_TRANS_HALF_TOPIC（一个特殊的内部topic）
+        // 原queue -> 0（一个固定的队列号）
+        // 这个topic和queue对消费者是不可见的，里面的消息永远不会被消费，
+        // 这样就保证了在tx提交之前 consumer 无法消费这个半消息
         msgInner.setTopic(TransactionalMessageUtil.buildHalfTopic());
         msgInner.setQueueId(0);
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
