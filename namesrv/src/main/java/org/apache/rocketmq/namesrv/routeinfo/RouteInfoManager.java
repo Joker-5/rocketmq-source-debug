@@ -46,15 +46,19 @@ import org.apache.rocketmq.common.protocol.route.TopicRouteData;
 import org.apache.rocketmq.common.sysflag.TopicSysFlag;
 import org.apache.rocketmq.remoting.common.RemotingUtil;
 
+// NameServer最核心的实现类，负责保存和管理集群路由信息
+// 需要注意的是这些路由信息都是保存在内存里的，并且没有持久化
 public class RouteInfoManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
     private final static long BROKER_CHANNEL_EXPIRED_TIME = 1000 * 60 * 2;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private final HashMap<String/* topic */, List<QueueData>> topicQueueTable;
-    private final HashMap<String/* brokerName */, BrokerData> brokerAddrTable;
-    private final HashMap<String/* clusterName */, Set<String/* brokerName */>> clusterAddrTable;
-    private final HashMap<String/* brokerAddr */, BrokerLiveInfo> brokerLiveTable;
-    private final HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
+    // 用HashMap保存路由信息
+    private final HashMap<String/* topic */, List<QueueData>> topicQueueTable; // 保存主题和队列信息
+    private final HashMap<String/* brokerName */, BrokerData> brokerAddrTable; // 保存brokerName对应的broker信息
+    // 下面三个不是很重要，核心的还是上面俩
+    private final HashMap<String/* clusterName */, Set<String/* brokerName */>> clusterAddrTable; // 保存集群名称和brokerName对应关系
+    private final HashMap<String/* brokerAddr */, BrokerLiveInfo> brokerLiveTable; // 保存broker当前的动态信息，包括心跳更新时间，路由数据版本等
+    private final HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable; // 保存broker对应的消息过滤服务，用于服务端消息过滤
 
     public RouteInfoManager() {
         this.topicQueueTable = new HashMap<String, List<QueueData>>(1024);
@@ -100,6 +104,8 @@ public class RouteInfoManager {
         return topicList.encode();
     }
 
+    // 核心就是一句话：根据broker请求过来的路由信息，依次对比并更新5个map，
+    // 同时为了保证并发安全性（因为这5个map管理的资源是一个整体），在修改前加了个RW锁
     public RegisterBrokerResult registerBroker(
         final String clusterName,
         final String brokerAddr,
@@ -112,8 +118,10 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                // 1.加写锁，防止并发修改数据
                 this.lock.writeLock().lockInterruptibly();
 
+                // 2.更新clusterAddrTable
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
@@ -121,10 +129,12 @@ public class RouteInfoManager {
                 }
                 brokerNames.add(brokerName);
 
+                // 3.更新brokerAddrTable
                 boolean registerFirst = false;
 
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                 if (null == brokerData) {
+                    // 之前集群中不存在，标识需要先注册
                     registerFirst = true;
                     brokerData = new BrokerData(clusterName, brokerName, new HashMap<Long, String>());
                     this.brokerAddrTable.put(brokerName, brokerData);
@@ -132,6 +142,7 @@ public class RouteInfoManager {
                 Map<Long, String> brokerAddrsMap = brokerData.getBrokerAddrs();
                 //Switch slave to master: first remove <1, IP:PORT> in namesrv, then add <0, IP:PORT>
                 //The same IP:PORT must only have one record in brokerAddrTable
+                // 4.更新brokerAddrTable中的brokerData
                 Iterator<Entry<Long, String>> it = brokerAddrsMap.entrySet().iterator();
                 while (it.hasNext()) {
                     Entry<Long, String> item = it.next();
@@ -140,6 +151,7 @@ public class RouteInfoManager {
                     }
                 }
 
+                // 5.如果是新注册的 master broker或 broker中的路由信息变了，需要更新topicQueue
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
                 registerFirst = registerFirst || (null == oldAddr);
 
@@ -157,6 +169,7 @@ public class RouteInfoManager {
                     }
                 }
 
+                // 6.更新brokerLiveTable
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
@@ -167,6 +180,7 @@ public class RouteInfoManager {
                     log.info("new broker registered, {} HAServer: {}", brokerAddr, haServerAddr);
                 }
 
+                // 7.更新filterServerTable
                 if (filterServerList != null) {
                     if (filterServerList.isEmpty()) {
                         this.filterServerTable.remove(brokerAddr);
@@ -175,6 +189,7 @@ public class RouteInfoManager {
                     }
                 }
 
+                // 8.如果是 slave broker，还需要在返回的信息中带上master相关信息
                 if (MixAll.MASTER_ID != brokerId) {
                     String masterAddr = brokerData.getBrokerAddrs().get(MixAll.MASTER_ID);
                     if (masterAddr != null) {
