@@ -104,7 +104,7 @@ public class RouteInfoManager {
         return topicList.encode();
     }
 
-    // 核心就是一句话：根据broker请求过来的路由信息，依次对比并更新5个map，
+    // 注册broker到NameServer，核心就是一句话：根据broker请求过来的路由信息，依次对比并更新5个map，
     // 同时为了保证并发安全性（因为这5个map管理的资源是一个整体），在修改前加了个RW锁
     public RegisterBrokerResult registerBroker(
         final String clusterName,
@@ -400,6 +400,7 @@ public class RouteInfoManager {
     }
 
     public TopicRouteData pickupTopicRouteData(final String topic) {
+        // 1.初始化返回数据 topicRouteData
         TopicRouteData topicRouteData = new TopicRouteData();
         boolean foundQueueData = false;
         boolean foundBrokerData = false;
@@ -412,18 +413,21 @@ public class RouteInfoManager {
 
         try {
             try {
+                // 2.加读锁
                 this.lock.readLock().lockInterruptibly();
+                // 3.获取topic对应的队列信息
                 List<QueueData> queueDataList = this.topicQueueTable.get(topic);
                 if (queueDataList != null) {
+                    // 封装队列信息
                     topicRouteData.setQueueDatas(queueDataList);
                     foundQueueData = true;
-
+                    // 4.遍历队列，找到所有brokerName
                     Iterator<QueueData> it = queueDataList.iterator();
                     while (it.hasNext()) {
                         QueueData qd = it.next();
                         brokerNameSet.add(qd.getBrokerName());
                     }
-
+                    // 4.遍历brokerName，找到对应的brokerData，封装结果
                     for (String brokerName : brokerNameSet) {
                         BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                         if (null != brokerData) {
